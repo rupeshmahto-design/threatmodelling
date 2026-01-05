@@ -402,6 +402,15 @@ Generate the complete, detailed threat assessment report now.
         else:
             final_prompt = prompt
 
+        # Save a short preview of the formatted prompt for debugging (visible only on error)
+        try:
+            preview = final_prompt[:300]
+            # Store in session_state for retrieval in the exception handler
+            setattr(st.session_state, '_debug_prompt_preview', preview)
+        except Exception:
+            # Non-fatal if session state isn't writable in some test contexts
+            _debug_prompt_preview = final_prompt[:300]
+
         # Use the Anthropic completions API for this client version
         completion = client.completions.create(
             model="claude-sonnet-4-20250514",
@@ -413,7 +422,16 @@ Generate the complete, detailed threat assessment report now.
         # The Completion object exposes the generated text on `.completion`
         return getattr(completion, "completion", str(completion))
     except Exception as e:
+        # Show the error and include a prompt preview to help diagnose formatting issues
         st.error(f"Error generating threat assessment: {str(e)}")
+        preview = getattr(st.session_state, '_debug_prompt_preview', None) if hasattr(st, 'session_state') else None
+        if not preview:
+            # Fallback if session_state wasn't set
+            preview = globals().get('_debug_prompt_preview', None)
+        if preview:
+            st.error(f"Formatted prompt preview (first 300 chars): {repr(preview)}")
+        else:
+            st.error("Formatted prompt preview not available")
         return None
 
 def create_pdf_download(report_content, project_name):
