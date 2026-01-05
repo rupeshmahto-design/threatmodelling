@@ -391,6 +391,12 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install --prefer-binary --only-binary=:all: numpy pandas Pillow -v
 ```
 
+**Tip:** If you see an error like `Client.__init__\(\) got an unexpected keyword argument 'proxies'` when calling the Anthropic client, it's caused by an incompatible `httpx` version. Install a compatible `httpx` version in your venv:
+
+```bash
+python -m pip install httpx==0.23.3
+```
+
 Note: this repo pins `Pillow==10.4.0` to stay compatible with `streamlit==1.29.0` (which requires `pillow<11`) while still using prebuilt wheels on Windows. If you prefer a newer Pillow, consider upgrading Streamlit first.
 
 ---
@@ -502,6 +508,12 @@ threat-modeling-tool/
 2. **Frameworks** - Update FRAMEWORKS dictionary (lines 50-80)
 3. **Risk Areas** - Update RISK_AREAS dictionary (lines 82-150)
 4. **Prompts** - Modify generate_threat_assessment() function
+
+**Prompt Debugging Toggle**
+
+- The app includes a **sidebar checkbox**: **Enable prompt debugging (show prompt preview on API errors)**. When enabled, the first ~300 characters of the **formatted** prompt will be displayed in the UI if the Claude API returns an error. This helps diagnose formatting issues (for example, missing the required "\n\nHuman:" prefix).
+
+- **Privacy warning:** the preview can include snippets of uploaded documents or other project information. **Do not enable** this toggle when working with sensitive content or when sharing your screen.
 
 ### To Deploy:
 

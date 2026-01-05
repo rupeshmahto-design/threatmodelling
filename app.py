@@ -405,11 +405,14 @@ Generate the complete, detailed threat assessment report now.
         # Save a short preview of the formatted prompt for debugging (visible only on error)
         try:
             preview = final_prompt[:300]
-            # Store in session_state for retrieval in the exception handler
-            setattr(st.session_state, '_debug_prompt_preview', preview)
+            # Only store preview if user has enabled prompt debugging
+            if getattr(st.session_state, 'prompt_debug_enabled', False):
+                setattr(st.session_state, '_debug_prompt_preview', preview)
         except Exception:
             # Non-fatal if session state isn't writable in some test contexts
-            _debug_prompt_preview = final_prompt[:300]
+            # Only store fallback if debugging is conceptually enabled
+            if globals().get('PROMPT_DEBUG_ENABLED_FALLBACK', False):
+                _debug_prompt_preview = final_prompt[:300]
 
         # Use the Anthropic completions API for this client version
         completion = client.completions.create(
@@ -467,6 +470,14 @@ def main():
             st.success("✓ API Key configured")
         else:
             st.warning("⚠️ Please enter your API key to continue")
+
+        # Toggle to enable prompt debugging (only when troubleshooting)
+        st.checkbox(
+            "Enable prompt debugging (show prompt preview on API errors)",
+            value=False,
+            help="When enabled, the first 300 characters of the formatted prompt will be shown when the Claude API returns an error. Do NOT enable when uploading sensitive documents.",
+            key="prompt_debug_enabled"
+        )
         
         st.markdown("---")
         
@@ -740,9 +751,16 @@ def main():
                     progress_bar.progress(100)
                     status_text.text("✅ Assessment complete!")
                     
-                    st.session_state.threat_report = threat_report
+                        st.session_state.threat_report = threat_report
                     st.session_state.assessment_complete = True
                     st.session_state.processing = False
+
+                    # Clear any stored prompt preview to avoid leaving sensitive data in session state
+                    try:
+                        if hasattr(st.session_state, '_debug_prompt_preview'):
+                            delattr(st.session_state, '_debug_prompt_preview')
+                    except Exception:
+                        pass
                     
                     st.success("🎉 Threat assessment generated successfully!")
                     st.balloons()
