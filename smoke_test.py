@@ -69,9 +69,24 @@ class FakeCompletions:
         return FakeCompletion("SMOKE TEST: generated text")
 
 
+class FakeMessages:
+    def create(self, *args, **kwargs):
+        # Expect 'messages' kwarg with messages[0]['content'] containing the prompt text
+        messages = kwargs.get('messages') if 'messages' in kwargs else (args[1] if len(args) > 1 else None)
+        if not messages or not isinstance(messages, list):
+            raise AssertionError("Messages API called without messages list")
+        content = messages[0].get('content', '') if isinstance(messages[0], dict) else ''
+        if 'You are an expert' not in content:
+            raise AssertionError("Messages content missing expected payload")
+        return FakeCompletion("SMOKE TEST: generated text")
+
+
+
 class FakeAnthropic:
     def __init__(self, *args, **kwargs):
         self._completions = FakeCompletions()
+        # Provide beta.messages API used for Claude models
+        self.beta = types.SimpleNamespace(messages=FakeMessages())
 
     @property
     def completions(self):

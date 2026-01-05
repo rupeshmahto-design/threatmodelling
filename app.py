@@ -192,6 +192,7 @@ RISK_AREAS = {
             "Loss of human oversight and control"
         ]
     },
+
     "Model Risk": {
         "description": "Risks associated with AI/ML model deployment and operations",
         "threats": [
@@ -241,6 +242,11 @@ RISK_AREAS = {
         ]
     }
 }
+
+# Model families that should always use the Messages API (case-insensitive substring match)
+PREFERRED_MESSAGES_API_FAMILIES = [
+    "claude",
+]
 
 def extract_text_from_file(uploaded_file):
     """Extract text content from uploaded files"""
@@ -414,16 +420,167 @@ Generate the complete, detailed threat assessment report now.
             if globals().get('PROMPT_DEBUG_ENABLED_FALLBACK', False):
                 _debug_prompt_preview = final_prompt[:300]
 
-        # Use the Anthropic completions API for this client version
-        completion = client.completions.create(
-            model="claude-sonnet-4-20250514",
-            prompt=final_prompt,
-            max_tokens_to_sample=16000,
-            temperature=0,
-        )
+        # Decide whether to use the Completions API or the Messages API
+        model_name = "claude-sonnet-4-20250514"
+        prefer_messages_auto = any(prefix in model_name.lower() for prefix in PREFERRED_MESSAGES_API_FAMILIES)
+        prefer_messages = getattr(st.session_state, 'force_messages_api', False) or prefer_messages_auto
 
-        # The Completion object exposes the generated text on `.completion`
-        return getattr(completion, "completion", str(completion))
+        # If preferring messages API, call it directly
+        if prefer_messages:
+            try:
+                content = final_prompt
+                if content.startswith("\n\nHuman:"):
+                    content = content.split("Human:", 1)[1].lstrip()
+                elif content.startswith("\n\nSystem:"):
+                    content = content.split("System:", 1)[1].lstrip()
+
+                messages = [{"role": "user", "content": content}]
+
+                resp = client.beta.messages.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=16000,
+                    temperature=0,
+                )
+
+                # Try to extract text content from common response shapes
+                def _extract_message_text(resp_obj):
+                    # Check common attributes
+                    for attr in ("message", "output", "content", "completion"):
+                        if hasattr(resp_obj, attr):
+                            candidate = getattr(resp_obj, attr)
+                            # dict-like
+                            if isinstance(candidate, dict):
+                                # common nested patterns
+                                for key in ("text", "content", "parts", "output_text"):
+                                    if key in candidate:
+                                        val = candidate[key]
+                                        if isinstance(val, list):
+                                            return "".join(map(str, val))
+                                        if isinstance(val, str):
+                                            return val
+                                # fallback to string
+                                return str(candidate)
+                            # object-like
+                            if isinstance(candidate, str):
+                                return candidate
+                            # try attributes
+                            for subattr in ("text", "content", "parts", "message"):
+                                if hasattr(candidate, subattr):
+                                    sub = getattr(candidate, subattr)
+                                    if isinstance(sub, list):
+                                        return "".join(map(str, sub))
+                                    if isinstance(sub, str):
+                                        return sub
+                    # resp_obj might be a dict
+                    if isinstance(resp_obj, dict):
+                        for key in ("text", "content", "completion", "message"):
+                            if key in resp_obj:
+                                v = resp_obj[key]
+                                if isinstance(v, str):
+                                    return v
+                                if isinstance(v, list):
+                                    return "".join(map(str, v))
+                                if isinstance(v, dict):
+                                    # nested
+                                    for k in ("text", "content"):
+                                        if k in v and isinstance(v[k], str):
+                                            return v[k]
+                    # fallback
+                    return str(resp_obj)
+
+                return _extract_message_text(resp)
+            except Exception as e_msg:
+                # Surface helpful message in the UI
+                st.error(f"Error using Messages API: {str(e_msg)}")
+                return None
+
+        # Otherwise try the completions API first and fall back to messages if needed
+        try:
+            completion = client.completions.create(
+                model=model_name,
+                prompt=final_prompt,
+                max_tokens_to_sample=16000,
+                temperature=0,
+            )
+
+            # The Completion object exposes the generated text on `.completion`
+            return getattr(completion, "completion", str(completion))
+        except Exception as e_comp:
+            # If the model requires the Messages API, fall back and try that
+            msg = str(e_comp)
+            if "Messages API" in msg or "not supported on this API" in msg or "claude-sonnet" in model_name:
+                try:
+                    # Convert the final_prompt into a single user message for the Messages API
+                    content = final_prompt
+                    # strip leading human/system prefixes that were used for the completions endpoint
+                    if content.startswith("\n\nHuman:"):
+                        content = content.split("Human:", 1)[1].lstrip()
+                    elif content.startswith("\n\nSystem:"):
+                        content = content.split("System:", 1)[1].lstrip()
+
+                    messages = [{"role": "user", "content": content}]
+
+                    # Use the beta messages API
+                    resp = client.beta.messages.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=16000,
+                        temperature=0,
+                    )
+
+                    # Try to extract text content from common response shapes
+                    def _extract_message_text(resp_obj):
+                        # Check common attributes
+                        for attr in ("message", "output", "content", "completion"):
+                            if hasattr(resp_obj, attr):
+                                candidate = getattr(resp_obj, attr)
+                                # dict-like
+                                if isinstance(candidate, dict):
+                                    # common nested patterns
+                                    for key in ("text", "content", "parts", "output_text"):
+                                        if key in candidate:
+                                            val = candidate[key]
+                                            if isinstance(val, list):
+                                                return "".join(map(str, val))
+                                            if isinstance(val, str):
+                                                return val
+                                    # fallback to string
+                                    return str(candidate)
+                                # object-like
+                                if isinstance(candidate, str):
+                                    return candidate
+                                # try attributes
+                                for subattr in ("text", "content", "parts", "message"):
+                                    if hasattr(candidate, subattr):
+                                        sub = getattr(candidate, subattr)
+                                        if isinstance(sub, list):
+                                            return "".join(map(str, sub))
+                                        if isinstance(sub, str):
+                                            return sub
+                        # resp_obj might be a dict
+                        if isinstance(resp_obj, dict):
+                            for key in ("text", "content", "completion", "message"):
+                                if key in resp_obj:
+                                    v = resp_obj[key]
+                                    if isinstance(v, str):
+                                        return v
+                                    if isinstance(v, list):
+                                        return "".join(map(str, v))
+                                    if isinstance(v, dict):
+                                        # nested
+                                        for k in ("text", "content"):
+                                            if k in v and isinstance(v[k], str):
+                                                return v[k]
+                        # fallback
+                        return str(resp_obj)
+
+                    return _extract_message_text(resp)
+                except Exception as e_msg:
+                    # If the fallback fails, raise the original completion error for visibility
+                    raise e_comp from e_msg
+            # Re-raise if it's not the messages API case
+            raise
     except Exception as e:
         # Show the error and include a prompt preview to help diagnose formatting issues
         st.error(f"Error generating threat assessment: {str(e)}")
@@ -477,6 +634,14 @@ def main():
             value=False,
             help="When enabled, the first 300 characters of the formatted prompt will be shown when the Claude API returns an error. Do NOT enable when uploading sensitive documents.",
             key="prompt_debug_enabled"
+        )
+
+        # Optionally force use of the Messages API (override auto-detection)
+        st.checkbox(
+            "Force use of Messages API (override auto-detection)",
+            value=False,
+            help="When enabled, the app will use the Messages API instead of the Completions API regardless of model family detection. Use for debugging or compatibility testing.",
+            key="force_messages_api"
         )
         
         st.markdown("---")
