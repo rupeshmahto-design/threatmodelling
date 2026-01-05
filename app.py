@@ -750,8 +750,8 @@ def main():
                 if threat_report:
                     progress_bar.progress(100)
                     status_text.text("✅ Assessment complete!")
-                    
-                        st.session_state.threat_report = threat_report
+
+                    st.session_state.threat_report = threat_report
                     st.session_state.assessment_complete = True
                     st.session_state.processing = False
 
@@ -761,7 +761,7 @@ def main():
                             delattr(st.session_state, '_debug_prompt_preview')
                     except Exception:
                         pass
-                    
+
                     st.success("🎉 Threat assessment generated successfully!")
                     st.balloons()
                 else:
