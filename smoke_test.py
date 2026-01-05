@@ -65,8 +65,10 @@ class FakeCompletions:
         prompt = kwargs.get('prompt', '') if 'prompt' in kwargs else (args[1] if len(args) > 1 else '')
         if not isinstance(prompt, str) or not prompt.startswith("\n\nHuman:"):
             raise AssertionError("Prompt not prefixed with '\\n\\nHuman:'")
-        # Return a fake completion object similar to the real library
-        return FakeCompletion("SMOKE TEST: generated text")
+        # Return a fake generated report containing the required sections
+        return FakeCompletion(
+            "TABLE OF CONTENTS\n- [EXECUTIVE SUMMARY](#executive-summary)\n- [THREAT MODELING ANALYSIS](#threat-modeling-analysis)\n- [REFERENCES](#references)\n\n## EXECUTIVE SUMMARY\nOverall Risk Rating: LOW\nTop 5 Findings:\n- Test finding 1\n- Test finding 2\n\n## THREAT MODELING ANALYSIS\n...\n\n## REFERENCES\n- [NIST SP 800-53] https://csrc.nist.gov/"
+        )
 
 
 class FakeMessages:
@@ -78,7 +80,9 @@ class FakeMessages:
         content = messages[0].get('content', '') if isinstance(messages[0], dict) else ''
         if 'You are an expert' not in content:
             raise AssertionError("Messages content missing expected payload")
-        return FakeCompletion("SMOKE TEST: generated text")
+        return FakeCompletion(
+            "TABLE OF CONTENTS\n- [EXECUTIVE SUMMARY](#executive-summary)\n- [THREAT MODELING ANALYSIS](#threat-modeling-analysis)\n- [REFERENCES](#references)\n\n## EXECUTIVE SUMMARY\nOverall Risk Rating: LOW\nTop 5 Findings:\n- Test finding 1\n- Test finding 2\n\n## THREAT MODELING ANALYSIS\n...\n\n## REFERENCES\n- [NIST SP 800-53] https://csrc.nist.gov/"
+        )
 
 
 
@@ -122,7 +126,14 @@ def run_smoke_test():
             print("SMOKE_TEST: Failed — result is not a string or is empty")
             return 2
 
-        print("SMOKE_TEST: Success — output snippet:\n", result[:300])
+        # Verify the report contains required structure
+        required = ["TABLE OF CONTENTS", "EXECUTIVE SUMMARY", "REFERENCES"]
+        for r in required:
+            if r not in result:
+                print(f"SMOKE_TEST: Failed — missing required section: {r}")
+                return 4
+
+        print("SMOKE_TEST: Success — output snippet:\n", result[:500])
         return 0
 
     except Exception as e:

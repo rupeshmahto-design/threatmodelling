@@ -263,6 +263,72 @@ def extract_text_from_file(uploaded_file):
     except Exception as e:
         return f"[Error reading {uploaded_file.name}: {str(e)}]"
 
+def _suggest_references_from_text(text):
+    """Return a set of suggested short citations (text, url) based on keywords in the report."""
+    suggestions = set()
+
+    # Small keyword -> citation mapping (can be extended)
+    MAPPING = {
+        'prompt injection': ("OWASP Prompt Injection Guidance", "https://owasp.org/"),
+        'prompt-injection': ("OWASP Prompt Injection Guidance", "https://owasp.org/"),
+        'injection': ("OWASP Top 10", "https://owasp.org/www-project-top-ten/"),
+        'mitre': ("MITRE ATT&CK", "https://attack.mitre.org/"),
+        'privilege escalation': ("CWE-269 Privilege Not Checked", "https://cwe.mitre.org/") ,
+        'data exfiltration': ("NIST SP 800-53", "https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final"),
+        'compliance': ("ISO 27001", "https://www.iso.org/isoiec-27001-information-security.html"),
+        'agent': ("AI Safety Papers", "https://arxiv.org/"),
+    }
+
+    lower = text.lower()
+    for k, v in MAPPING.items():
+        if k in lower:
+            suggestions.add(v)
+    return suggestions
+
+
+def _merge_references_section(report_md, suggestions):
+    """Ensure suggestions (set of (text,url)) appear in the REFERENCES section of report_md.
+    Returns the updated markdown.
+    """
+    if not suggestions:
+        return report_md
+
+    # Find if a REFERENCES section exists
+    lines = report_md.splitlines()
+    ref_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().upper().startswith('## REFERENCES') or line.strip().upper().startswith('# REFERENCES'):
+            ref_idx = i
+            break
+
+    # Build suggestion lines
+    suggestion_lines = [f"- [{text}] {url}" for (text, url) in sorted(suggestions)]
+
+    if ref_idx is None:
+        # Append a References section
+        if not report_md.endswith('\n'):
+            report_md += '\n'
+        report_md += '\n## REFERENCES\n' + '\n'.join(suggestion_lines) + '\n'
+        return report_md
+
+    # If references section exists, find its end (next top-level heading or EOF)
+    end_idx = len(lines)
+    for j in range(ref_idx + 1, len(lines)):
+        if lines[j].startswith('#'):
+            end_idx = j
+            break
+
+    # Collect existing refs
+    existing = set(l.strip() for l in lines[ref_idx+1:end_idx] if l.strip())
+    for s in suggestion_lines:
+        if s not in existing:
+            existing.add(s)
+
+    new_refs = ['## REFERENCES'] + sorted(existing)
+    new_lines = lines[:ref_idx] + new_refs + lines[end_idx:]
+    return '\n'.join(new_lines)
+
+
 def generate_threat_assessment(project_info, documents_content, framework, risk_areas, api_key):
     """Generate comprehensive threat assessment using Claude AI"""
     
@@ -398,6 +464,19 @@ Recommend:
 - Use risk level indicators: CRITICAL, HIGH, MEDIUM, LOW
 
 Generate the complete, detailed threat assessment report now.
+
+Please follow these additional formatting and content requirements:
+
+- Add a top-level **TABLE OF CONTENTS** listing all major sections with markdown links to each section (e.g., `- [EXECUTIVE SUMMARY](#executive-summary)`).
+- Begin the report with an **EXECUTIVE SUMMARY** section (2–4 short paragraphs) that includes:
+  - A one-line **Overall Risk Rating** (CRITICAL/HIGH/MEDIUM/LOW).
+  - **Top 5 Findings** (bulleted, one sentence each).
+  - **Top 3 Prioritized Recommendations** (short bullets).
+- For each **CRITICAL** or **HIGH** finding include a short **Rationale** paragraph explaining why the finding is scored that way and include at least one authoritative reference (cite sources inline using short bracketed citations, e.g., `[NIST SP 800-53]`, `[OWASP Top 10]`, `[MITRE ATT&CK]`, `[ISO 27001]`).
+- At the end of the report include a **REFERENCES** section listing the cited sources with short URLs where possible.
+- Use clear markdown headings, tables for matrices, and bullet lists; bold critical findings and label risk levels clearly.
+
+Generate the document in Markdown so it renders well as both Markdown and PDF.
 """
 
     # Call Claude API
@@ -610,22 +689,40 @@ def create_pdf_download(report_content, project_name):
         import markdown as _markdown  # optional
         from weasyprint import HTML  # optional
 
-        html_body = _markdown.markdown(report_content, extensions=["tables", "fenced_code"]) if report_content else ""
+        # Use python-markdown with toc extension to generate a Table of Contents
+        md = _markdown.Markdown(extensions=["tables", "fenced_code", "toc"])
+        html_body = md.convert(report_content or "")
+        toc_html = md.toc if hasattr(md, 'toc') else ''
+
         full_html = f"""
         <html>
         <head>
             <meta charset="utf-8">
             <style>
-                body {{ font-family: Arial, Helvetica, sans-serif; margin: 2rem; line-height:1.4; color: #222 }}
+                @page {{ size: A4; margin: 2cm }}
+                @page :left {{ @bottom-right {{ content: "Page " counter(page) " of " counter(pages); }} }}
+                @page :right {{ @bottom-right {{ content: "Page " counter(page) " of " counter(pages); }} }}
+                body {{ font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 2.5cm 2cm 2.5cm 2cm; line-height:1.4; color: #222 }}
+                header {{ position: running(header); font-size: 0.9rem; color: #666; text-align: center }}
                 h1,h2,h3 {{ color: #1f4e79 }}
+                .toc {{ background: #f7f9fb; padding: 1rem; border: 1px solid #e6eef6; margin-bottom: 1rem }}
+                .toc h2 {{ margin-top: 0 }}
                 table {{ border-collapse: collapse; width: 100% }}
                 table, th, td {{ border: 1px solid #ddd; padding: 8px }}
                 pre {{ background: #f8f8f8; padding: 8px; white-space: pre-wrap; overflow-wrap: break-word }}
                 code {{ background: #f1f1f1; padding: 2px 4px; border-radius: 4px }}
+                .references {{ font-size: 0.9rem }}
             </style>
         </head>
         <body>
+        <header>
+            <div><strong>{project_name}</strong> — Threat Assessment</div>
+            <div>Generated: {datetime.now().strftime('%Y-%m-%d')}</div>
+        </header>
+        <main>
+        <div class='toc'><h2>Table of Contents</h2>{toc_html}</div>
         {html_body}
+        </main>
         </body>
         </html>
         """
@@ -944,8 +1041,16 @@ def main():
                     selected_risks,
                     api_key
                 )
-                
+
+                # Augment references automatically when possible
                 if threat_report:
+                    try:
+                        suggestions = _suggest_references_from_text(threat_report)
+                        threat_report = _merge_references_section(threat_report, suggestions)
+                    except Exception:
+                        # Non-fatal if augmentation errors
+                        pass
+
                     progress_bar.progress(100)
                     status_text.text("✅ Assessment complete!")
 

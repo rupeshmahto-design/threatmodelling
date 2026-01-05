@@ -519,6 +519,10 @@ threat-modeling-tool/
 
 - The app attempts to generate a nicely formatted **PDF** of the report after a successful run. This uses `markdown` and `weasyprint` (both optional). If those are not available, the app falls back to offering a **Markdown (.md)** download.
 
+- The generated PDF now includes a **Table of Contents**, a header (project & date), and page numbers for a professional, client-ready layout.
+
+- The app also augments reports with **suggested authoritative references** when it detects common findings (e.g., prompt injection, privilege escalation). You can review and edit the references before downloading.
+
 - To enable PDF output locally on Windows, install the optional Python packages and system dependencies:
 
   - Install Python packages in your venv:
