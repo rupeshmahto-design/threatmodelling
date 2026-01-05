@@ -531,6 +531,8 @@ threat-modeling-tool/
 
   - WeasyPrint requires system libraries (Cairo, Pango, GDK-PixBuf). On Windows, the easiest option is to use the official WeasyPrint Windows installer or install GTK dependencies via MSYS/Chocolatey. See: https://weasyprint.org/docs/
 
+  - If you see the application return a Markdown download instead of a PDF, check the **PDF export** indicator in the sidebar (it will say which package is missing) and consult the log message shown under the Download button — it often includes the underlying Python exception (e.g., missing library or invalid environment).
+
 - If you prefer a simpler route, you can convert the `.md` output to PDF with Pandoc or wkhtmltopdf externally.
 
 ### To Deploy:

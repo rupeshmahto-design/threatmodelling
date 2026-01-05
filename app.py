@@ -673,16 +673,37 @@ Generate the document in Markdown so it renders well as both Markdown and PDF.
             st.error("Formatted prompt preview not available")
         return None
 
+def _pdf_support_status():
+    """Return (supported: bool, reason: str)."""
+    try:
+        import markdown as _markdown  # type: ignore
+    except Exception as e:
+        return False, "missing Python package 'markdown'"
+    try:
+        from weasyprint import HTML  # type: ignore
+    except Exception as e:
+        return False, "missing 'weasyprint' or its system dependencies (Cairo/Pango)"
+    return True, ""
+
+
 def create_pdf_download(report_content, project_name):
     """Create a PDF download (preferred) and a markdown fallback.
 
     Tries to render the markdown report to PDF using WeasyPrint. If the
     required packages or system libraries are not available, falls back to
-    returning the raw markdown and a `.md` filename.
+    returning the raw markdown and a `.md` filename. When running in the
+    Streamlit app, diagnostic details are stored in `st.session_state['_pdf_error']`.
     """
     base = f"Threat_Assessment_{project_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}"
     pdf_filename = f"{base}.pdf"
     md_filename = f"{base}.md"
+
+    # Clear previous diagnostic
+    try:
+        if hasattr(st, 'session_state') and hasattr(st.session_state, '_pdf_error'):
+            delattr(st.session_state, '_pdf_error')
+    except Exception:
+        pass
 
     # Try to convert markdown -> HTML -> PDF using WeasyPrint (optional dependency)
     try:
@@ -729,7 +750,13 @@ def create_pdf_download(report_content, project_name):
 
         pdf_bytes = HTML(string=full_html).write_pdf()
         return pdf_filename, pdf_bytes, "application/pdf"
-    except Exception:
+    except Exception as e:
+        # Store diagnostic info for UI visibility if possible
+        try:
+            if hasattr(st, 'session_state'):
+                setattr(st.session_state, '_pdf_error', str(e))
+        except Exception:
+            pass
         # If anything fails, return the markdown as a fallback
         return md_filename, report_content, "text/markdown"
 
@@ -757,6 +784,13 @@ def main():
             st.success("✓ API Key configured")
         else:
             st.warning("⚠️ Please enter your API key to continue")
+
+        # PDF availability indicator
+        pdf_supported, pdf_reason = _pdf_support_status()
+        if pdf_supported:
+            st.success("PDF export: available (weasyprint & markdown detected)")
+        else:
+            st.warning(f"PDF export: not available — {pdf_reason}. See installation guidance in the docs.")
 
         # Toggle to enable prompt debugging (only when troubleshooting)
         st.checkbox(
@@ -1116,6 +1150,13 @@ def main():
                     mime=mime,
                     use_container_width=True
                 )
+
+                # Inform the user why PDF generation was unavailable
+                pdf_err = getattr(st.session_state, '_pdf_error', None) if hasattr(st, 'session_state') else None
+                if pdf_err:
+                    st.warning(f"PDF generation not available: {pdf_err}")
+                else:
+                    st.info("PDF generation not available in this environment. To enable it install the 'markdown' and 'weasyprint' packages and WeasyPrint system deps (Cairo/Pango). See INSTALLATION_GUIDE.md for details.")
         
         with col2:
             if st.button("🔄 Generate New Assessment", use_container_width=True):
