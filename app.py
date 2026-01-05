@@ -595,13 +595,46 @@ Generate the complete, detailed threat assessment report now.
         return None
 
 def create_pdf_download(report_content, project_name):
-    """Create PDF download link"""
-    # For now, we'll create a text file that can be easily converted to PDF
-    # In production, use a proper PDF library like ReportLab
-    
-    filename = f"Threat_Assessment_{project_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.md"
-    
-    return filename, report_content
+    """Create a PDF download (preferred) and a markdown fallback.
+
+    Tries to render the markdown report to PDF using WeasyPrint. If the
+    required packages or system libraries are not available, falls back to
+    returning the raw markdown and a `.md` filename.
+    """
+    base = f"Threat_Assessment_{project_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}"
+    pdf_filename = f"{base}.pdf"
+    md_filename = f"{base}.md"
+
+    # Try to convert markdown -> HTML -> PDF using WeasyPrint (optional dependency)
+    try:
+        import markdown as _markdown  # optional
+        from weasyprint import HTML  # optional
+
+        html_body = _markdown.markdown(report_content, extensions=["tables", "fenced_code"]) if report_content else ""
+        full_html = f"""
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, Helvetica, sans-serif; margin: 2rem; line-height:1.4; color: #222 }}
+                h1,h2,h3 {{ color: #1f4e79 }}
+                table {{ border-collapse: collapse; width: 100% }}
+                table, th, td {{ border: 1px solid #ddd; padding: 8px }}
+                pre {{ background: #f8f8f8; padding: 8px; white-space: pre-wrap; overflow-wrap: break-word }}
+                code {{ background: #f1f1f1; padding: 2px 4px; border-radius: 4px }}
+            </style>
+        </head>
+        <body>
+        {html_body}
+        </body>
+        </html>
+        """
+
+        pdf_bytes = HTML(string=full_html).write_pdf()
+        return pdf_filename, pdf_bytes, "application/pdf"
+    except Exception:
+        # If anything fails, return the markdown as a fallback
+        return md_filename, report_content, "text/markdown"
 
 def main():
     # Header
@@ -946,18 +979,38 @@ def main():
         col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
-            filename, content = create_pdf_download(
+            filename, content, mime = create_pdf_download(
                 st.session_state.threat_report,
                 project_name
             )
-            
-            st.download_button(
-                label="📥 Download Report (Markdown)",
-                data=content,
-                file_name=filename,
-                mime="text/markdown",
-                use_container_width=True
-            )
+
+            if mime == "application/pdf":
+                # PDF generated successfully
+                st.download_button(
+                    label="📥 Download Report (PDF)",
+                    data=content,
+                    file_name=filename,
+                    mime=mime,
+                    use_container_width=True
+                )
+
+                # Also offer the markdown version
+                md_filename = filename.rsplit('.', 1)[0] + ".md"
+                st.download_button(
+                    label="📥 Download Report (Markdown)",
+                    data=st.session_state.threat_report,
+                    file_name=md_filename,
+                    mime="text/markdown",
+                    use_container_width=True
+                )
+            else:
+                st.download_button(
+                    label="📥 Download Report (Markdown)",
+                    data=content,
+                    file_name=filename,
+                    mime=mime,
+                    use_container_width=True
+                )
         
         with col2:
             if st.button("🔄 Generate New Assessment", use_container_width=True):

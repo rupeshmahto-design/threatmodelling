@@ -515,6 +515,20 @@ threat-modeling-tool/
 
 - **Privacy warning:** the preview can include snippets of uploaded documents or other project information. **Do not enable** this toggle when working with sensitive content or when sharing your screen.
 
+**PDF Generation**
+
+- The app attempts to generate a nicely formatted **PDF** of the report after a successful run. This uses `markdown` and `weasyprint` (both optional). If those are not available, the app falls back to offering a **Markdown (.md)** download.
+
+- To enable PDF output locally on Windows, install the optional Python packages and system dependencies:
+
+  - Install Python packages in your venv:
+
+    pip install markdown weasyprint
+
+  - WeasyPrint requires system libraries (Cairo, Pango, GDK-PixBuf). On Windows, the easiest option is to use the official WeasyPrint Windows installer or install GTK dependencies via MSYS/Chocolatey. See: https://weasyprint.org/docs/
+
+- If you prefer a simpler route, you can convert the `.md` output to PDF with Pandoc or wkhtmltopdf externally.
+
 ### To Deploy:
 
 1. **DEPLOYMENT.md** - Step-by-step for all platforms
