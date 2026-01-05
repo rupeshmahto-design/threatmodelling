@@ -396,10 +396,16 @@ Generate the complete, detailed threat assessment report now.
 
     # Call Claude API
     try:
+        # Ensure prompt starts with the required Human turn for Claude
+        if not (prompt.startswith("\n\nHuman:") or prompt.startswith("\n\nSystem:") or prompt.startswith("Human:") or prompt.startswith("System:")):
+            final_prompt = f"\n\nHuman: {prompt}\n\nAssistant:"
+        else:
+            final_prompt = prompt
+
         # Use the Anthropic completions API for this client version
         completion = client.completions.create(
             model="claude-sonnet-4-20250514",
-            prompt=prompt,
+            prompt=final_prompt,
             max_tokens_to_sample=16000,
             temperature=0,
         )
