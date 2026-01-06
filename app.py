@@ -1704,11 +1704,21 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Configuration")
         
-        # API Key input
+        # API Key input (prefill from Streamlit secrets or environment for deployments)
+        default_api_key = ""
+        try:
+            if hasattr(st, 'secrets') and 'SECUREAI_API_KEY' in st.secrets:
+                default_api_key = st.secrets['SECUREAI_API_KEY'] or ""
+        except Exception:
+            pass
+        if not default_api_key:
+            default_api_key = os.environ.get('SECUREAI_API_KEY', "")
+
         api_key = st.text_input(
             "SecureAI API Key",
             type="password",
-            help="Enter your SecureAI API key to enable threat assessment"
+            value=default_api_key,
+            help="Enter your SecureAI API key to enable threat assessment (or set SECUREAI_API_KEY in Streamlit secrets/env)"
         )
         
         if api_key:
@@ -1833,7 +1843,7 @@ def main():
     
     # Main content
     if not api_key:
-        st.info("👈 Please enter your Anthropic API key in the sidebar to get started")
+        st.info("👈 Please enter your SecureAI API key in the sidebar to get started")
         st.markdown("""
         ### Get Your API Key
         1. Visit [SecureAI Console](https://console.anthropic.com/)
