@@ -330,7 +330,7 @@ def _merge_references_section(report_md, suggestions):
 
 
 def generate_threat_assessment(project_info, documents_content, framework, risk_areas, api_key):
-    """Generate comprehensive threat assessment using Claude AI"""
+    """Generate comprehensive threat assessment using SecureAI"""
     
     client = anthropic.Anthropic(api_key=api_key)
     
@@ -765,7 +765,7 @@ def main():
     st.markdown("""
         <div style='text-align: center; padding: 2rem 0;'>
             <h1>🔒 AI-Powered Threat Modeling Tool</h1>
-            <p class='header-subtitle'>Enterprise-grade threat assessment powered by Claude AI</p>
+            <p class='header-subtitle'>Enterprise-grade threat assessment powered by SecureAI</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -775,9 +775,9 @@ def main():
         
         # API Key input
         api_key = st.text_input(
-            "Anthropic API Key",
+            "SecureAI API Key",
             type="password",
-            help="Enter your Anthropic API key to enable threat assessment"
+            help="Enter your SecureAI API key to enable threat assessment"
         )
         
         if api_key:
@@ -796,7 +796,7 @@ def main():
         st.checkbox(
             "Enable prompt debugging (show prompt preview on API errors)",
             value=False,
-            help="When enabled, the first 300 characters of the formatted prompt will be shown when the Claude API returns an error. Do NOT enable when uploading sensitive documents.",
+            help="When enabled, the first 300 characters of the formatted prompt will be shown when the SecureAI API returns an error. Do NOT enable when uploading sensitive documents.",
             key="prompt_debug_enabled"
         )
 
@@ -826,7 +826,7 @@ def main():
         st.markdown("### 💡 Help")
         with st.expander("How to use this tool"):
             st.markdown("""
-            1. **Enter API Key:** Add your Anthropic API key
+            1. **Enter API Key:** Add your SecureAI API key
             2. **Project Info:** Fill in project details
             3. **Upload Documents:** Add architecture diagrams, design docs, etc.
             4. **Select Framework:** Choose your threat modeling approach
@@ -847,10 +847,10 @@ def main():
     
     # Main content
     if not api_key:
-        st.info("👈 Please enter your Anthropic API key in the sidebar to get started")
+        st.info("👈 Please enter your SecureAI API key in the sidebar to get started")
         st.markdown("""
         ### Get Your API Key
-        1. Visit [Anthropic Console](https://console.anthropic.com/)
+        1. Visit [SecureAI Console](https://console.anthropic.com/)
         2. Create an account or sign in
         3. Generate an API key
         4. Paste it in the sidebar
@@ -1065,7 +1065,7 @@ def main():
                 }
                 
                 # Step 3: Generate assessment
-                status_text.text("🤖 Generating threat assessment with Claude AI...")
+                status_text.text("🤖 Generating threat assessment with SecureAI...")
                 progress_bar.progress(60)
                 
                 threat_report = generate_threat_assessment(
