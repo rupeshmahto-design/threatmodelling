@@ -2,6 +2,9 @@
 
 Enterprise-grade threat assessment platform powered by SecureAI (Anthropic). Generate comprehensive threat models in minutes, not days.
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-streamlit-app-url.example.com)
+<!-- Replace the link above with your deployed Streamlit app URL -->
+
 ![Version](https://img.shields.io/badge/version-1.1.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
@@ -68,7 +71,7 @@ Enterprise-grade threat assessment platform powered by SecureAI (Anthropic). Gen
 
 ### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.11 or higher
 - SecureAI API key (Anthropic) ([Get one here](https://console.anthropic.com/))
 
 ### Installation
@@ -90,6 +93,23 @@ Enterprise-grade threat assessment platform powered by SecureAI (Anthropic). Gen
    ```bash
    streamlit run app.py
    ```
+
+### Quick Local Run (PowerShell)
+
+```powershell
+# Create and activate venv (Windows)
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Optional: set API key for this session
+$env:SECUREAI_API_KEY = "your-actual-api-key"
+
+# Run the app (defaults to port 8501)
+streamlit run app.py
+```
 
 ## ✅ Smoke Test (Local + CI)
 
@@ -113,7 +133,7 @@ If the smoke test fails locally, paste the output here and we can diagnose furth
 
 4. **Open your browser**
 - Navigate to `http://localhost:8501`
-- Enter your Anthropic API key in the sidebar
+- Enter your SecureAI API key in the sidebar
 - Start creating threat assessments!
 
 ## 🌐 Web Deployment
@@ -239,6 +259,7 @@ git push -u origin main
    - Click "Deploy"
 
 3. **Configure secrets**
+
    - In Streamlit Cloud dashboard
    - Go to App settings → Secrets
    - Add your API key (required)

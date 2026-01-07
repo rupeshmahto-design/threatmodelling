@@ -86,7 +86,7 @@ or
 python3 --version
 ```
 
-You need Python 3.9 or higher.
+You need Python 3.11 or higher (recommended).
 
 **Recommended (Windows):** We strongly recommend using **Python 3.11** for best compatibility with prebuilt wheels for packages like numpy and pandas. If you're on Windows, install Python 3.11 and recreate your virtual environment as shown below.
 
@@ -94,14 +94,14 @@ You need Python 3.9 or higher.
 
 - Windows (recommended): Download Python 3.11 from [python.org](https://www.python.org/downloads/release/python-311x/)
 
-  Create a new 3.11 venv and install dependencies:
+   Create a new 3.11 venv and install dependencies:
 
-  ```cmd
-  py -3.11 -m venv venv311
-  venv311\Scripts\activate
-  python -m pip install --upgrade pip setuptools wheel
-  pip install -r requirements.txt
-  ```
+   ```powershell
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\activate
+   python -m pip install --upgrade pip setuptools wheel
+   pip install -r requirements.txt
+   ```
 
 - Mac: `brew install python` or download from python.org
 - Linux: `sudo apt-get install python3 python3-pip`
@@ -129,7 +129,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### Step 5: Get Your Anthropic API Key
+#### Step 5: Get Your SecureAI (Anthropic) API Key
 
 1. Go to https://console.anthropic.com/
 2. Sign up or log in
@@ -149,7 +149,7 @@ pip install -r requirements.txt
 **Windows:**
 
 ```cmd
-venv\Scripts\activate
+\.venv\Scripts\activate
 streamlit run app.py
 ```
 
@@ -166,7 +166,7 @@ If it doesn't open automatically, click the link in your terminal.
 #### Step 8: Enter Your API Key
 
 - Look for the sidebar on the left
-- Find "Anthropic API Key" input field
+- Find "SecureAI API Key" input field
 - Paste your API key
 - Click anywhere else to confirm
 
@@ -189,7 +189,7 @@ If it doesn't open automatically, click the link in your terminal.
 3. **Run Docker Compose:**
 
    ```bash
-   docker-compose up -d
+   docker compose up --build
    ```
 
 4. **Open browser at:**
@@ -205,7 +205,7 @@ If it doesn't open automatically, click the link in your terminal.
 **To stop:**
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -245,8 +245,18 @@ docker-compose down
    - Main file path: app.py
    - Click "Deploy!"
 
-4. **Wait 2-3 minutes**
+4. **Add Secrets (required)**
+
+   In your app's Settings → Secrets, add:
+
+   ```toml
+   SECUREAI_API_KEY = "your-actual-api-key"
+   ```
+
+5. **Wait 2-3 minutes**
    Your app will be live at: `your-app-name.streamlit.app`
+
+   Note: Streamlit Cloud automatically installs native libraries listed in `packages.txt` (Cairo, Pango, etc.) so WeasyPrint works out of the box for fully formatted PDFs.
 
 5. **Share the URL** with your team!
 
@@ -511,13 +521,13 @@ threat-modeling-tool/
 
 **Prompt Debugging Toggle**
 
-- The app includes a **sidebar checkbox**: **Enable prompt debugging (show prompt preview on API errors)**. When enabled, the first ~300 characters of the **formatted** prompt will be displayed in the UI if the Claude API returns an error. This helps diagnose formatting issues (for example, missing the required "\n\nHuman:" prefix).
+- The app includes a **sidebar checkbox**: **Enable prompt debugging (show prompt preview on API errors)**. When enabled, the first ~300 characters of the **formatted** prompt will be displayed in the UI if the SecureAI API returns an error.
 
 - **Privacy warning:** the preview can include snippets of uploaded documents or other project information. **Do not enable** this toggle when working with sensitive content or when sharing your screen.
 
 **PDF Generation**
 
-- The app attempts to generate a nicely formatted **PDF** of the report after a successful run. This uses `markdown` and `weasyprint` (both optional). If those are not available, the app falls back to offering a **Markdown (.md)** download.
+- The app generates a professionally formatted **PDF** of the report using `markdown` + `weasyprint` when available. If those are not available locally, the app uses a styled **ReportLab fallback** so the PDF button still appears (reduced styling) or offers a **Markdown (.md)** download.
 
 - The generated PDF now includes a **Table of Contents**, a header (project & date), and page numbers for a professional, client-ready layout.
 
@@ -529,11 +539,13 @@ threat-modeling-tool/
 
     pip install markdown weasyprint
 
-  - WeasyPrint requires system libraries (Cairo, Pango, GDK-PixBuf). On Windows, the easiest option is to use the official WeasyPrint Windows installer or install GTK dependencies via MSYS/Chocolatey. See: https://weasyprint.org/docs/
+   - WeasyPrint requires system libraries (Cairo, Pango, GDK-PixBuf). On Windows, the simplest path is Docker (`docker compose up --build`) or follow the official Windows guidance: https://weasyprint.org/docs/
 
   - If you see the application return a Markdown download instead of a PDF, check the **PDF export** indicator in the sidebar (it will say which package is missing) and consult the log message shown under the Download button — it often includes the underlying Python exception (e.g., missing library or invalid environment).
 
-- If you prefer a simpler route, you can convert the `.md` output to PDF with Pandoc or wkhtmltopdf externally.
+- On Streamlit Cloud, native libraries listed in `packages.txt` are installed automatically during deploy — WeasyPrint works out of the box for fully formatted PDFs.
+
+- If you prefer, you can convert the `.md` output to PDF with Pandoc or wkhtmltopdf externally.
 
 ### To Deploy:
 
