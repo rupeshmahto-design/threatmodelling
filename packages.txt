@@ -1,4 +1,3 @@
-# System packages required for WeasyPrint on Streamlit Cloud / Debian-based images
 libcairo2
 libpango-1.0-0
 libpangocairo-1.0-0
