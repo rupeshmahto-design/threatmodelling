@@ -1657,8 +1657,124 @@ def create_pdf_download(report_content, project_name):
                 setattr(st.session_state, '_pdf_error', str(e))
         except Exception:
             pass
-        # If anything fails, return the markdown as a fallback
-        return md_filename, report_content, "text/markdown"
+
+        # Fallback: attempt a styled PDF using ReportLab so the button still appears
+        try:
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import cm
+            from reportlab.lib import colors
+            from bs4 import BeautifulSoup
+
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                leftMargin=2*cm,
+                rightMargin=2*cm,
+                topMargin=2*cm,
+                bottomMargin=2*cm,
+            )
+            styles = getSampleStyleSheet()
+            styles.add(ParagraphStyle(name='H1', fontSize=18, leading=22, spaceAfter=10, spaceBefore=10))
+            styles.add(ParagraphStyle(name='H2', fontSize=14, leading=18, spaceAfter=8, spaceBefore=8))
+            styles.add(ParagraphStyle(name='H3', fontSize=12, leading=16, spaceAfter=6, spaceBefore=6))
+            header_style = ParagraphStyle(
+                name='TableHeader',
+                parent=styles['BodyText'],
+                fontName='Helvetica-Bold',
+                textColor=colors.white,
+                fontSize=8,
+                leading=10
+            )
+            story = []
+
+            # Title
+            header_text = getattr(st.session_state, 'company_name', None) or "Threat Assessment"
+            story.append(Paragraph(f"{header_text} - Threat Assessment", styles['Title']))
+            story.append(Spacer(1, 12))
+
+            # Convert markdown to HTML and parse
+            try:
+                import markdown as _markdown
+                md = _markdown.Markdown(extensions=["tables", "fenced_code", "toc"])
+                html = md.convert(report_content or "")
+            except Exception:
+                html = f"<pre>{(report_content or '').replace('<','&lt;').replace('>','&gt;')}</pre>"
+
+            soup = BeautifulSoup(html, 'html.parser')
+
+            def colorize_text(text: str) -> str:
+                # Apply risk color spans recognized by ReportLab (<font color="...">)
+                rep = (
+                    ('CRITICAL', 'c53030'), ('Critical', 'c53030'),
+                    ('HIGH', 'd97706'), ('High', 'd97706'),
+                    ('MEDIUM', 'd69e2e'), ('Medium', 'd69e2e'),
+                    ('LOW', '22543d'), ('Low', '22543d'),
+                )
+                for key, col in rep:
+                    text = text.replace(key, f'<font color="#{col}"><b>{key}</b></font>')
+                return text
+
+            def add_table(table_tag):
+                rows = []
+                for tr in table_tag.find_all('tr'):
+                    cells = []
+                    for cell in tr.find_all(['th', 'td']):
+                        cell_text = colorize_text(cell.get_text(" ", strip=True))
+                        cell_style = header_style if cell.name == 'th' else styles['BodyText']
+                        cells.append(Paragraph(cell_text or " ", cell_style))
+                    rows.append(cells)
+                if not rows:
+                    return
+                tbl = Table(rows, repeatRows=1)
+                style_cmds = [
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e0')),
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d3748')),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0,0), (-1,-1), 8),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ]
+                # Zebra stripes for body
+                for i in range(1, len(rows)):
+                    bg = colors.HexColor('#f7fafc') if i % 2 == 1 else colors.white
+                    style_cmds.append(('BACKGROUND', (0,i), (-1,i), bg))
+                tbl.setStyle(TableStyle(style_cmds))
+                story.append(tbl)
+                story.append(Spacer(1, 10))
+
+            # Walk top-level elements and render
+            for el in soup.contents:
+                name = getattr(el, 'name', None)
+                if not name:
+                    # Text node
+                    txt = str(el).strip()
+                    if txt:
+                        story.append(Paragraph(colorize_text(txt), styles['BodyText']))
+                        story.append(Spacer(1, 6))
+                    continue
+
+                if name in ('h1', 'h2', 'h3'):
+                    style = styles['H1'] if name == 'h1' else styles['H2'] if name == 'h2' else styles['H3']
+                    story.append(Paragraph(colorize_text(el.get_text()), style))
+                    story.append(Spacer(1, 6))
+                elif name == 'p':
+                    story.append(Paragraph(colorize_text(el.decode_contents()), styles['BodyText']))
+                    story.append(Spacer(1, 6))
+                elif name == 'table':
+                    add_table(el)
+                else:
+                    # Fallback for other tags
+                    story.append(Paragraph(colorize_text(el.get_text()), styles['BodyText']))
+                    story.append(Spacer(1, 6))
+
+            doc.build(story)
+            pdf_bytes = buffer.getvalue()
+            return pdf_filename, pdf_bytes, "application/pdf"
+        except Exception:
+            # If ReportLab fallback also fails, return the markdown as a final fallback
+            return md_filename, report_content, "text/markdown"
 
 
 def render_markdown_as_html(markdown_text):
@@ -2177,6 +2293,15 @@ def main():
                     mime=mime,
                     use_container_width=True
                 )
+                # If WeasyPrint failed and we used the fallback, surface that clearly
+                pdf_err = getattr(st.session_state, '_pdf_error', None) if hasattr(st, 'session_state') else None
+                if pdf_err:
+                    st.warning(
+                        "Using basic PDF fallback (reduced styling). "
+                        "For the fully formatted PDF, install WeasyPrint system dependencies or use the Cloud deploy."
+                    )
+                    with st.expander("Show PDF engine diagnostics"):
+                        st.code(str(pdf_err))
 
         with col2:
             # Also offer the markdown version
